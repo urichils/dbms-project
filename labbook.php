@@ -4,18 +4,28 @@ include 'db.php';
 $message = "";
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $faculty_id = $_POST['faculty_id'];
-    $lab_id = $_POST['lab_id'];
-    $booking_date = $_POST['booking_date'];
-    $time_slot = $_POST['time_slot'];
+    $faculty_id = mysqli_real_escape_string($conn, $_POST['faculty_id']);
+    $lab_id = mysqli_real_escape_string($conn, $_POST['lab_id']);
+    $booking_date = mysqli_real_escape_string($conn, $_POST['booking_date']);
+    $time_slot = mysqli_real_escape_string($conn, $_POST['time_slot']);
 
-    $sql = "insert into lab_booking (faculty_id, lab_id, booking_date, time_slot) 
-            values ('$faculty_id', '$lab_id', '$booking_date', '$time_slot')";
+    $check_sql = "select booking_id from lab_booking 
+                  where lab_id = '$lab_id' 
+                  and booking_date = '$booking_date' 
+                  and time_slot = '$time_slot'";
+    $check_result = mysqli_query($conn, $check_sql);
 
-    if (mysqli_query($conn, $sql)) {
-        $message = "<p style='color: green;'>Booking saved successfully!</p>";
+    if (mysqli_num_rows($check_result) > 0) {
+        $message = "<p style='color: red;'>Error: This lab is already booked for that date and time slot!</p>";
     } else {
-        $message = "<p style='color: red;'>Error saving record: " . mysqli_error($conn) . "</p>";
+        $sql = "insert into lab_booking (faculty_id, lab_id, booking_date, time_slot) 
+                values ('$faculty_id', '$lab_id', '$booking_date', '$time_slot')";
+
+        if (mysqli_query($conn, $sql)) {
+            $message = "<p style='color: green;'>Booking saved successfully!</p>";
+        } else {
+            $message = "<p style='color: red;'>Error saving record: " . mysqli_error($conn) . "</p>";
+        }
     }
 }
 
@@ -65,7 +75,13 @@ $labs = mysqli_query($conn, "select * from lab");
 
         <p>
             <label>Time Slot:</label><br>
-            <input type="text" name="time_slot" placeholder="e.g. 09:00 AM - 11:00 AM" required>
+            <select name="time_slot" required>
+                <option value="">-- Select Time Slot --</option>
+                <option value="09:00 AM - 11:00 AM">09:00 AM - 11:00 AM</option>
+                <option value="11:00 AM - 01:00 PM">11:00 AM - 01:00 PM</option>
+                <option value="02:00 PM - 04:00 PM">02:00 PM - 04:00 PM</option>
+                <option value="04:00 PM - 05:00 PM">04:00 PM - 05:00 PM</option>
+            </select>
         </p>
 
         <button type="submit">Submit Booking</button>
