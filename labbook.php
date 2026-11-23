@@ -15,7 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($faculty_id)) {
         $message = "<p style='color: red;'>Error: Please select a faculty member or enter a Faculty ID!</p>";
     } else {
-        // Verify that the Faculty ID exists in the faculty table to avoid a foreign key crash
+        // Verify that the Faculty ID exists in the faculty table
         $fac_check = mysqli_query($conn, "select faculty_id from faculty where faculty_id = '$faculty_id'");
 
         if (mysqli_num_rows($fac_check) == 0) {
@@ -44,6 +44,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $faculties = mysqli_query($conn, "select * from faculty");
+$faculty_list = [];
+while ($row = mysqli_fetch_assoc($faculties)) {
+    $faculty_list[] = $row;
+}
+
 $labs = mysqli_query($conn, "select * from lab");
 ?>
 
@@ -60,17 +65,19 @@ $labs = mysqli_query($conn, "select * from lab");
     <form action="labbook.php" method="POST">
         <p>
             <label>Faculty Member:</label><br>
-            <select name="faculty_id">
+            <select name="faculty_id" id="faculty_select">
                 <option value="">-- Select Faculty --</option>
-                <?php while ($f = mysqli_fetch_assoc($faculties)): ?>
+                <?php foreach ($faculty_list as $f): ?>
                     <option value="<?php echo $f['faculty_id']; ?>">
                         <?php echo htmlspecialchars($f['name'] . " (" . $f['department'] . ")"); ?>
                     </option>
-                <?php endwhile; ?>
+                <?php endforeach; ?>
             </select>
-            <span> or </span>
-            <input type="number" name="faculty_id_manual" placeholder="Enter Faculty ID">
+            <span> OR </span>
+            <input type="number" name="faculty_id_manual" id="faculty_manual" placeholder="Enter Faculty ID">
         </p>
+
+        <div id="faculty-info" style="display: none; margin-top: -8px; margin-bottom: 14px; padding: 8px 12px; background: #f4f6f8; border-left: 4px solid #2b6cb0; max-width: 420px; font-size: 14px;"></div>
 
         <p>
             <label>Lab:</label><br>
@@ -105,5 +112,62 @@ $labs = mysqli_query($conn, "select * from lab");
 
     <br>
     <a href="report.php">View Booking Report (Page 2)</a>
+
+    <script>
+        const facultyRecords = <?php echo json_encode($faculty_list); ?>;
+        const facultySelect = document.getElementById('faculty_select');
+        const facultyManual = document.getElementById('faculty_manual');
+        const facultyInfo = document.getElementById('faculty-info');
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text ?? '';
+            return div.innerHTML;
+        }
+
+        function showFacultyDetails(id) {
+            const cleanId = String(id).trim();
+            if (!cleanId) {
+                facultyInfo.style.display = 'none';
+                facultyInfo.innerHTML = '';
+                return;
+            }
+
+            const match = facultyRecords.find(f => String(f.faculty_id) === cleanId);
+
+            if (match) {
+                facultyInfo.style.display = 'block';
+                facultyInfo.style.borderLeftColor = '#2b6cb0';
+                facultyInfo.style.background = '#f4f6f8';
+                facultyInfo.style.color = '#1a202c';
+                facultyInfo.innerHTML = `
+                    <strong>Faculty Record (ID: ${escapeHtml(match.faculty_id)})</strong><br>
+                    Name: ${escapeHtml(match.name)}<br>
+                    Department: ${escapeHtml(match.department)}<br>
+                    Email: ${escapeHtml(match.email)}
+                `;
+            } else {
+                facultyInfo.style.display = 'block';
+                facultyInfo.style.borderLeftColor = '#c53030';
+                facultyInfo.style.background = '#fff5f5';
+                facultyInfo.style.color = '#c53030';
+                facultyInfo.innerHTML = `No faculty record found for ID <strong>${escapeHtml(cleanId)}</strong>.`;
+            }
+        }
+
+        facultySelect.addEventListener('change', function () {
+            if (this.value !== '') {
+                facultyManual.value = '';
+            }
+            showFacultyDetails(this.value);
+        });
+
+        facultyManual.addEventListener('input', function () {
+            if (this.value.trim() !== '') {
+                facultySelect.value = '';
+            }
+            showFacultyDetails(this.value);
+        });
+    </script>
 </body>
 </html>
