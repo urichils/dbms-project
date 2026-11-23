@@ -4,27 +4,41 @@ include 'db.php';
 $message = "";
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $faculty_id = mysqli_real_escape_string($conn, $_POST['faculty_id']);
+    // Use the manually typed Faculty ID if entered; otherwise use the dropdown selection
+    $raw_faculty_id = !empty(trim($_POST['faculty_id_manual'])) ? trim($_POST['faculty_id_manual']) : $_POST['faculty_id'];
+
+    $faculty_id = mysqli_real_escape_string($conn, $raw_faculty_id);
     $lab_id = mysqli_real_escape_string($conn, $_POST['lab_id']);
     $booking_date = mysqli_real_escape_string($conn, $_POST['booking_date']);
     $time_slot = mysqli_real_escape_string($conn, $_POST['time_slot']);
 
-    $check_sql = "select booking_id from lab_booking 
-                  where lab_id = '$lab_id' 
-                  and booking_date = '$booking_date' 
-                  and time_slot = '$time_slot'";
-    $check_result = mysqli_query($conn, $check_sql);
-
-    if (mysqli_num_rows($check_result) > 0) {
-        $message = "<p style='color: red;'>Error: This lab is already booked for that date and time slot!</p>";
+    if (empty($faculty_id)) {
+        $message = "<p style='color: red;'>Error: Please select a faculty member or enter a Faculty ID!</p>";
     } else {
-        $sql = "insert into lab_booking (faculty_id, lab_id, booking_date, time_slot) 
-                values ('$faculty_id', '$lab_id', '$booking_date', '$time_slot')";
+        // Verify that the Faculty ID exists in the faculty table to avoid a foreign key crash
+        $fac_check = mysqli_query($conn, "select faculty_id from faculty where faculty_id = '$faculty_id'");
 
-        if (mysqli_query($conn, $sql)) {
-            $message = "<p style='color: green;'>Booking saved successfully!</p>";
+        if (mysqli_num_rows($fac_check) == 0) {
+            $message = "<p style='color: red;'>Error: Faculty ID '$faculty_id' does not exist!</p>";
         } else {
-            $message = "<p style='color: red;'>Error saving record: " . mysqli_error($conn) . "</p>";
+            $check_sql = "select booking_id from lab_booking 
+                          where lab_id = '$lab_id' 
+                          and booking_date = '$booking_date' 
+                          and time_slot = '$time_slot'";
+            $check_result = mysqli_query($conn, $check_sql);
+
+            if (mysqli_num_rows($check_result) > 0) {
+                $message = "<p style='color: red;'>Error: This lab is already booked for that date and time slot!</p>";
+            } else {
+                $sql = "insert into lab_booking (faculty_id, lab_id, booking_date, time_slot) 
+                        values ('$faculty_id', '$lab_id', '$booking_date', '$time_slot')";
+
+                if (mysqli_query($conn, $sql)) {
+                    $message = "<p style='color: green;'>Booking saved successfully!</p>";
+                } else {
+                    $message = "<p style='color: red;'>Error saving record: " . mysqli_error($conn) . "</p>";
+                }
+            }
         }
     }
 }
@@ -46,7 +60,7 @@ $labs = mysqli_query($conn, "select * from lab");
     <form action="labbook.php" method="POST">
         <p>
             <label>Faculty Member:</label><br>
-            <select name="faculty_id" required>
+            <select name="faculty_id">
                 <option value="">-- Select Faculty --</option>
                 <?php while ($f = mysqli_fetch_assoc($faculties)): ?>
                     <option value="<?php echo $f['faculty_id']; ?>">
@@ -54,6 +68,8 @@ $labs = mysqli_query($conn, "select * from lab");
                     </option>
                 <?php endwhile; ?>
             </select>
+            <span> or </span>
+            <input type="number" name="faculty_id_manual" placeholder="Enter Faculty ID">
         </p>
 
         <p>
